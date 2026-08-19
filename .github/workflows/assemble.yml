@@ -1,0 +1,22 @@
+name: assemble-index
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "parts/**"
+jobs:
+  assemble:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Concatenate parts into index.html
+        run: cat parts/c00.txt parts/c01.txt parts/c02.txt parts/c03.txt parts/c04.txt parts/c05.txt parts/c06.txt parts/c07.txt parts/c08.txt parts/c09.txt parts/c10.txt parts/c11.txt parts/c12.txt parts/c13.txt parts/c14.txt parts/c15.txt parts/c16.txt parts/c17.txt parts/c18.txt parts/c19.txt > index.html
+      - name: Commit assembled page
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet || git commit -m "Assemble exact FreeTokens landing page as index.html"
+          git push
