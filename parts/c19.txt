@@ -1,0 +1,70 @@
+0JyB9LCAnKicpOwogIH0gZWxzZSB7CiAgICBsb2NhdGlvbi5yZWxvYWQoKTsKICB9Cn07CihmdW5jdGlvbiBzeW5jVGhlbWUoKSB7CiAgdHJ5IHsKICAgIGNvbnN0IHQgPSB3aW5kb3cucGFyZW50LmRvY3VtZW50LmRvY3VtZW50RWxlbWVudC5kYXRhc2V0LnRoZW1lOwogICAgaWYgKHQpIGRvY3VtZW50LmRvY3VtZW50RWxlbWVudC5kYXRhc2V0LnRoZW1lID0gdDsKICB9IGNhdGNoIChlKSB7CiAgICBjb25zdCBkYXJrID0gd2luZG93Lm1hdGNoTWVkaWEgJiYgd2luZG93Lm1hdGNoTWVkaWEoJyhwcmVmZXJzLWNvbG9yLXNjaGVtZTogZGFyayknKS5tYXRjaGVzOwogICAgZG9jdW1lbnQuZG9jdW1lbnRFbGVtZW50LmRhdGFzZXQudGhlbWUgPSBkYXJrID8gJ2RhcmsnIDogJ2xpZ2h0JzsKICB9Cn0pKCk7CgpyZW5kZXJOYXYoKTsKcmVuZGVyU3RhZ2UoKTsKPC9zY3JpcHQ+CjwvYm9keT4KPC9odG1sPgo=";
+function decodeApp() {
+  const bin = atob(APP_B64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+function currentTheme() {
+  return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+}
+function setTheme(t) {
+  const theme = t === "dark" ? "dark" : "light";
+  document.documentElement.setAttribute("data-theme", theme);
+  try { localStorage.setItem("ft-landing-theme", theme); } catch (e) {}
+  document.querySelectorAll("[data-theme-set]").forEach((b) => b.classList.toggle("on", b.dataset.themeSet === theme));
+  const frame = document.getElementById("appFrame");
+  try { frame.contentWindow.setSampleTheme(theme); } catch (e) {}
+}
+function loadApp() {
+  const frame = document.getElementById("appFrame");
+  frame.srcdoc = decodeApp();
+  frame.onload = () => {
+    try { frame.contentWindow.setSampleTheme(currentTheme()); } catch (e) {}
+  };
+}
+(function initTheme() {
+  let theme = "light";
+  try { theme = localStorage.getItem("ft-landing-theme") || ""; } catch (e) {}
+  if (!theme) theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  setTheme(theme);
+})();
+document.querySelectorAll("[data-theme-set]").forEach((b) => {
+  b.onclick = () => setTheme(b.dataset.themeSet);
+});
+loadApp();
+window.addEventListener("message", (e) => {
+  if (e.data && e.data.type === "ft-reset") loadApp();
+});
+document.getElementById("playHere").onclick = () => {
+  const frame = document.getElementById("appFrame");
+  try { frame.contentWindow.playSample(); } catch (e) {}
+};
+document.getElementById("resetDemo").onclick = () => {
+  const frame = document.getElementById("appFrame");
+  try { frame.contentWindow.resetSample(); } catch (e) { loadApp(); }
+};
+async function pretextHeadings() {
+  if (!window.Pretext) return;
+  await document.fonts.ready;
+  const { prepare, layout } = window.Pretext;
+  const els = document.querySelectorAll("[data-pretext]");
+  const font = getComputedStyle(document.documentElement).getPropertyValue("--font-serif").trim() || "Cambo, Georgia, serif";
+  const relayout = () => {
+    els.forEach((el) => {
+      const size = parseFloat(getComputedStyle(el).fontSize) || 40;
+      const width = el.clientWidth;
+      if (width < 40) return;
+      const prepared = prepare(el.textContent, `${size}px ${font}`);
+      const { height } = layout(prepared, width, size * 1.12);
+      el.style.minHeight = `${Math.ceil(height)}px`;
+    });
+  };
+  relayout();
+  const ro = new ResizeObserver(relayout);
+  els.forEach((el) => ro.observe(el));
+}
+pretextHeadings();
+</script>
+</body>
+</html>
