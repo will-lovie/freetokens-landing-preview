@@ -1,19 +1,812 @@
-<!DOCTYPE html>
-<meta charset="utf-8">
-<title>FreeTokens</title>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Free LLM tokens, harvested on your Mac | FreeTokens by Lovie</title>
+<meta name="description" content="FreeTokens is a native Mac app that harvests free LLM API keys into a local vault, then lets you chat and edit on those keys. Apply stays with you." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cambo&family=Geist+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet" />
 <script>
-(async () => {
-  const ids = [...Array(20).keys()].map((i) => String(i).padStart(2, "0"));
-  const parts = await Promise.all(
-    ids.map((id) => fetch("parts/c" + id + ".txt").then((r) => {
-      if (!r.ok) throw new Error("missing parts/c" + id + ".txt (" + r.status + ")");
-      return r.text();
-    }))
-  );
-  document.open();
-  document.write(parts.join(""));
-  document.close();
-})().catch((e) => {
-  document.body.textContent = "Failed to assemble landing page: " + e;
-});
+(function () {
+  try {
+    var t = localStorage.getItem("ft-landing-theme");
+    if (!t) t = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", t);
+  } catch (e) {
+    document.documentElement.setAttribute("data-theme", "light");
+  }
+})();
 </script>
+<style>
+:root, html[data-theme="light"] {
+  --bg: #f8f7f7;
+  --fg: #161515;
+  --gray: #555151;
+  --muted: #6b6767;
+  --ash: #b4b0b0;
+  --stroke: #dfdfdf;
+  --white: #fff;
+  --green: #29f197;
+  --on-green: #161515;
+  --blue: #1d4ed8;
+  --surface: #ffffff;
+  color-scheme: light;
+}
+html[data-theme="dark"] {
+  --bg: #161515;
+  --fg: #f8f7f7;
+  --gray: #b4b0b0;
+  --muted: #b4b0b0;
+  --ash: #837e7e;
+  --stroke: #333333;
+  --white: #242323;
+  --green: #29f197;
+  --on-green: #161515;
+  --blue: #1d4ed8;
+  --surface: #242323;
+  color-scheme: dark;
+}
+:root {
+  --card-r: 12px;
+  --font-serif: "Cambo", Georgia, serif;
+  --font-sans: "Inter Tight", Arial, sans-serif;
+  --font-body: "Inter Tight", Arial, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
+  --font-app: "Instrument Sans", "Inter Tight", sans-serif;
+  --wrap: 1120px;
+  --nav-h: 64px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.5;
+}
+a { color: inherit; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; border: 0; background: none; }
+:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+.skip {
+  position: absolute; left: 12px; top: -40px;
+  background: var(--fg); color: var(--bg); padding: 8px 12px; border-radius: 8px; z-index: 80;
+}
+.skip:focus { top: 12px; }
+
+.nav {
+  position: sticky; top: 0; z-index: 50;
+  background: var(--bg);
+  border-bottom: 1px solid var(--stroke);
+}
+.nav-inner {
+  max-width: calc(var(--wrap) + 64px);
+  margin: 0 auto;
+  min-height: var(--nav-h);
+  padding: 10px 24px;
+  display: flex; align-items: center; gap: 20px;
+}
+.brand {
+  display: flex; align-items: center; gap: 10px;
+  text-decoration: none; flex-shrink: 0;
+}
+.mark {
+  width: 28px; height: 28px; border-radius: 7px;
+  background: var(--green); color: var(--on-green);
+  display: grid; place-items: center;
+  font-family: var(--font-serif); font-size: 16px; line-height: 1;
+}
+.brand-name { font-weight: 600; font-size: 15px; letter-spacing: -.02em; }
+.brand-by {
+  font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--gray);
+  margin-top: 2px;
+}
+.nav-links {
+  display: flex; gap: 22px; margin: 0 auto;
+  font-size: 14px; font-weight: 500; color: var(--gray);
+}
+.nav-links a { text-decoration: none; }
+.nav-links a:hover { color: var(--fg); }
+.nav-cta { margin-left: auto; flex-shrink: 0; }
+.nav-end { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.theme-switch {
+  display: flex; border: 1px solid var(--stroke); border-radius: 999px; padding: 3px; background: var(--white);
+}
+.theme-switch button {
+  font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  padding: 6px 10px; border-radius: 999px; color: var(--gray);
+}
+.theme-switch button.on { background: var(--fg); color: var(--bg); }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 6px; text-decoration: none; font-weight: 500;
+  border-radius: 999px; padding: 10px 16px; font-size: 14px;
+  border: 1px solid transparent; line-height: 1.2;
+}
+.btn-ink { background: var(--fg); color: var(--bg); }
+.btn-ink:hover { opacity: .9; }
+.btn-green { background: var(--green); color: var(--on-green); font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; padding: 7px 12px; font-weight: 500; }
+.btn-ghost { color: var(--gray); padding: 7px 4px; }
+.btn-ghost:hover { color: var(--fg); }
+.btn-line { border-color: var(--stroke); background: var(--white); }
+
+.wrap { max-width: var(--wrap); margin: 0 auto; padding: 0 24px; }
+.section { padding: 88px 0; border-top: 1px solid var(--stroke); scroll-margin-top: 80px; }
+.section-hero { padding: 48px 0 36px; border-top: 0; scroll-margin-top: 80px; }
+.kicker {
+  font-family: var(--font-serif);
+  font-size: 12px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ash); margin-bottom: 14px;
+}
+h1, .h1 {
+  font-family: var(--font-serif); font-weight: 400;
+  font-size: clamp(36px, 4.4vw, 52px); line-height: 1.1; letter-spacing: -.02em;
+}
+h2 {
+  font-family: var(--font-serif); font-weight: 400;
+  font-size: clamp(28px, 3.2vw, 40px); line-height: 1.15; letter-spacing: -.02em;
+}
+h3 { font-size: 20px; font-weight: 600; letter-spacing: -.02em; }
+.lede { font-family: var(--font-serif); font-size: 20px; color: var(--gray); margin-top: 12px; line-height: 1.35; }
+.prose { margin-top: 16px; color: var(--gray); font-size: 16px; max-width: 62ch; }
+.prose a { color: var(--fg); font-weight: 500; }
+
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 48px; align-items: start; }
+.hero-cta { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 28px; }
+.trust { font-size: 13px; color: var(--muted); }
+.chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--stroke); }
+.chip-k {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+}
+.chip-v { font-size: 12px; color: var(--gray); margin-top: 4px; }
+
+.hero-cards { display: flex; flex-direction: column; gap: 12px; }
+.card {
+  background: var(--surface); border: 1px solid var(--stroke); border-radius: var(--card-r);
+  padding: 16px 18px;
+}
+.card-h {
+  display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px;
+  font-size: 13px; font-weight: 600;
+}
+.card-h span { font-family: var(--font-mono); font-size: 10px; color: var(--gray); font-weight: 400; letter-spacing: .08em; text-transform: uppercase; }
+.row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--stroke); font-size: 14px; }
+.row:first-of-type { border-top: 0; padding-top: 0; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+.dot.off { background: var(--stroke); }
+.pct { margin-left: auto; font-family: var(--font-mono); font-size: 12px; color: var(--gray); }
+.note { font-size: 12px; color: var(--muted); margin-top: 10px; }
+
+.strip {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 16px 0 8px; border-top: 1px solid var(--stroke); margin-top: 28px;
+  font-size: 12px; color: var(--gray);
+}
+.strip-l { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.strip-k { font-family: var(--font-mono); letter-spacing: .14em; text-transform: uppercase; font-size: 10px; color: var(--ash); }
+.strip a { font-weight: 500; text-decoration: none; border: 1px solid var(--stroke); border-radius: 999px; padding: 8px 12px; background: var(--white); }
+
+.bullets { margin-top: 20px; padding-left: 18px; color: var(--gray); }
+.bullets li { margin: 8px 0; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 32px; }
+.grid-3 h3 { margin-bottom: 8px; }
+.grid-3 p { color: var(--gray); font-size: 15px; }
+.stat-line {
+  display: flex; justify-content: space-between; gap: 12px;
+  margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--stroke);
+  font-size: 13px;
+}
+.stat-line b { font-weight: 600; }
+.stat-line span { color: var(--gray); }
+
+.cap { display: grid; grid-template-columns: 72px 1fr; gap: 8px 20px; padding: 28px 0; border-top: 1px solid var(--stroke); }
+.cap:first-of-type { border-top: 0; }
+.cap-n { font-family: var(--font-mono); font-size: 13px; color: var(--ash); padding-top: 6px; }
+.cap-ui { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.pill {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: .04em;
+  border: 1px solid var(--stroke); border-radius: 999px; padding: 5px 10px; background: var(--bg);
+}
+.pill.on { background: var(--green); border-color: var(--green); color: var(--on-green); }
+.mini { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+.mini div { border: 1px solid var(--stroke); border-radius: 10px; padding: 10px 12px; background: var(--bg); }
+.mini b { display: block; font-size: 16px; }
+.mini span { font-size: 12px; color: var(--gray); }
+
+.demo-intro { max-width: 72ch; margin-bottom: 28px; }
+.win {
+  border: 1px solid var(--stroke); border-radius: 14px; overflow: hidden;
+  background: var(--white); min-height: 620px;
+  display: flex; flex-direction: column;
+  font-family: var(--font-app);
+}
+.win-bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px; border-bottom: 1px solid var(--stroke);
+  background: var(--bg);
+}
+.traffic { display: flex; gap: 7px; }
+.traffic i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+.traffic .r { background: #ff5f57; }
+.traffic .y { background: #febc2e; }
+.traffic .g { background: #28c840; }
+.win-title { font-size: 13px; font-weight: 600; }
+.win-sub { font-family: var(--font-mono); font-size: 10px; color: var(--gray); letter-spacing: .08em; text-transform: uppercase; }
+.win-actions { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.win-body { display: grid; grid-template-columns: 188px 1fr; min-height: 500px; flex: 1; }
+.win-side {
+  border-right: 1px solid var(--stroke); padding: 16px 12px;
+  background: color-mix(in srgb, var(--white) 70%, var(--bg));
+}
+.side-brand { display: flex; gap: 8px; align-items: center; padding: 4px 8px 16px; }
+.side-mark {
+  width: 28px; height: 28px; border-radius: 7px; background: var(--fg); color: var(--bg);
+  display: grid; place-items: center; font-family: var(--font-serif);
+}
+.side-name { font-size: 13px; font-weight: 600; }
+.side-meta { font-size: 11px; color: var(--gray); }
+.side-nav { display: flex; flex-direction: column; gap: 2px; }
+.side-nav button {
+  text-align: left; padding: 8px 10px; border-radius: 8px;
+  font-size: 13px; font-weight: 500; color: var(--gray);
+}
+.side-nav button:hover { background: var(--bg); color: var(--fg); }
+.side-nav button.active { background: var(--bg); color: var(--fg); }
+.side-note { margin-top: 18px; padding: 0 10px; font-size: 11px; color: var(--muted); }
+.win-main { padding: 20px 22px 18px; min-width: 0; display: flex; flex-direction: column; min-height: 0; overflow: auto; }
+.win-h { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
+.win-h h3 { font-size: 18px; }
+.win-h p { font-size: 13px; color: var(--gray); margin-top: 2px; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+.stats div { border: 1px solid var(--stroke); border-radius: 10px; padding: 12px; }
+.stats span { display: block; font-size: 12px; color: var(--gray); }
+.stats b { font-size: 18px; font-weight: 600; }
+.preview {
+  border: 1px solid var(--stroke); border-radius: 10px; padding: 14px; margin-bottom: 12px;
+  background: var(--bg);
+}
+.preview strong { font-size: 13px; }
+.preview p { font-size: 12px; color: var(--gray); margin: 4px 0 10px; }
+.plist { border: 1px solid var(--stroke); border-radius: 10px; overflow: hidden; }
+.plist button, .plist .item {
+  width: 100%; display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-top: 1px solid var(--stroke); text-align: left; font-size: 13px;
+}
+.plist .item:first-child, .plist button:first-child { border-top: 0; }
+.tag {
+  margin-left: auto; font-family: var(--font-mono); font-size: 10px;
+  border-radius: 999px; padding: 3px 8px; border: 1px solid var(--stroke); color: var(--gray);
+}
+.tag.have { background: var(--green); border-color: var(--green); color: var(--on-green); }
+.tag.run { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+
+.thread { flex: 1; display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow: auto; }
+.bubble { max-width: 92%; font-size: 13.5px; line-height: 1.45; }
+.bubble.me { align-self: flex-end; }
+.bubble .who { font-size: 11px; color: var(--gray); margin-bottom: 4px; }
+.bubble .bd { background: var(--bg); border: 1px solid var(--stroke); border-radius: 12px; padding: 10px 12px; }
+.bubble.me .bd { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.diff { border: 1px solid var(--stroke); border-radius: 10px; overflow: hidden; font-family: var(--font-mono); font-size: 11.5px; }
+.diff-h { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--bg); font-family: var(--font-app); font-size: 12px; font-weight: 600; }
+.diff pre { padding: 2px 12px; white-space: pre-wrap; }
+.diff .ctx { color: var(--gray); }
+.diff .del { background: color-mix(in srgb, #dc2626 10%, transparent); color: #991b1b; }
+.diff .add { background: color-mix(in srgb, var(--green) 22%, transparent); }
+.composer { margin-top: auto; padding-top: 12px; }
+.composer-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.box {
+  width: 100%; border: 1px solid var(--stroke); border-radius: 12px;
+  padding: 10px 12px; font-size: 13px; color: var(--gray); background: var(--bg); text-align: left;
+}
+
+.agents { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.agent { border: 1px solid var(--stroke); border-radius: 12px; padding: 16px; text-align: left; }
+.agent:hover { background: var(--bg); }
+.agent h4 { font-size: 15px; margin-bottom: 6px; }
+.agent p { font-size: 13px; color: var(--gray); min-height: 40px; }
+.agent .meta { font-family: var(--font-mono); font-size: 10px; color: var(--muted); margin: 10px 0 12px; }
+
+.after-demo {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 14px;
+  margin-top: 18px;
+}
+.toast {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 999px;
+  font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 70;
+}
+.toast.on { opacity: 1; }
+
+.dl-grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 16px; margin-top: 28px; }
+.code {
+  font-family: var(--font-mono); font-size: 12px; background: var(--bg);
+  border: 1px solid var(--stroke); border-radius: 8px; padding: 8px 10px;
+  overflow-x: auto; margin-top: 8px; user-select: all;
+}
+.req { list-style: none; margin-top: 12px; }
+.req li { padding: 8px 0; border-top: 1px solid var(--stroke); font-size: 14px; color: var(--gray); }
+.req li:first-child { border-top: 0; }
+.req b { color: var(--fg); font-weight: 600; }
+
+.faq details { border-top: 1px solid var(--stroke); padding: 16px 0; }
+.faq details:first-of-type { border-top: 0; }
+.faq summary { cursor: pointer; font-weight: 600; font-size: 16px; list-style: none; display: flex; justify-content: space-between; gap: 16px; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; color: var(--gray); font-weight: 400; }
+.faq details[open] summary::after { content: "–"; }
+.faq p { margin-top: 10px; color: var(--gray); max-width: 72ch; }
+
+.close {
+  margin-top: 48px; padding: 32px; border: 1px solid var(--stroke); border-radius: 14px; background: var(--white);
+}
+.close h2 { margin-bottom: 8px; }
+.foot {
+  border-top: 1px solid var(--stroke); padding: 40px 0 28px; font-size: 13px; color: var(--gray);
+}
+.foot-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 24px; }
+.foot a { text-decoration: none; display: block; margin: 6px 0; }
+.foot a:hover { color: var(--fg); }
+.foot h6 { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; font-family: var(--font-mono); color: var(--ash); margin-bottom: 8px; font-weight: 500; }
+.legal { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--stroke); font-size: 12px; }
+
+@media (max-width: 1024px) {
+  .hero, .win-body, .dl-grid, .foot-grid { grid-template-columns: 1fr; }
+  .win-side { border-right: 0; border-bottom: 1px solid var(--stroke); }
+  .side-nav { flex-direction: row; flex-wrap: wrap; }
+  .nav-links { display: none; }
+}
+@media (max-width: 768px) {
+  .section { padding: 56px 0; }
+  .grid-3, .chips, .agents, .stats, .mini { grid-template-columns: 1fr; }
+  .cap { grid-template-columns: 1fr; }
+  .hero-cta .btn { width: 100%; }
+}
+@media (max-width: 375px) {
+  h1 { font-size: 32px; }
+  .wrap { padding: 0 16px; }
+}
+
+.sample-frame { margin-top: 8px; }
+.sample-chrome {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px; border: 1px solid var(--stroke); border-bottom: 0;
+  border-radius: 14px 14px 0 0; background: var(--surface);
+}
+.sample-chrome .win-title { font-size: 13px; font-weight: 600; }
+.sample-chrome .win-sub { font-family: var(--font-mono); font-size: 10px; color: var(--gray); letter-spacing: .08em; text-transform: uppercase; }
+.sample-chrome .win-actions { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.app-frame {
+  width: 100%; height: min(820px, 86vh); border: 1px solid var(--stroke);
+  border-radius: 0 0 14px 14px; background: var(--bg); display: block;
+}
+.sample-note { font-size: 12px; color: var(--muted); margin-top: 10px; }
+</style>
+</head>
+<body>
+<a class="skip" href="#how">Skip to How it works</a>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#top">
+      <span class="mark" aria-hidden="true">L</span>
+      <span>
+        <div class="brand-name">FreeTokens</div>
+        <div class="brand-by">By Lovie</div>
+      </span>
+    </a>
+    <nav class="nav-links" aria-label="Page">
+      <a href="#problem">The problem</a>
+      <a href="#capabilities">Capabilities</a>
+      <a href="#agents">Agents</a>
+      <a href="#how">How it works</a>
+      <a href="#download">Download</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <div class="nav-end">
+      <div class="theme-switch" role="group" aria-label="Color mode">
+        <button type="button" data-theme-set="light">Light</button>
+        <button type="button" data-theme-set="dark">Dark</button>
+      </div>
+      <a class="btn btn-ink" href="https://github.com/lovieco/freetokens-swift/releases/download/v1.1.0/FreeTokens-1.1.0.dmg">Download for Mac</a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+  <section class="section-hero wrap" aria-labelledby="hero-title">
+    <p class="kicker">01 — Built for founders who pay for tokens they shouldn't</p>
+    <div class="hero">
+      <div>
+        <h1 id="hero-title" data-pretext>Free LLM tokens. Harvested on your Mac.</h1>
+        <p class="lede">Built for founders who'd rather ship than paste keys into five dashboards.</p>
+        <p class="prose">FreeTokens signs you up for free LLM providers, stores the keys in a local vault, and lets you chat and edit on those keys. Apply stays with you.</p>
+        <div class="hero-cta">
+          <a class="btn btn-ink" href="https://github.com/lovieco/freetokens-swift/releases/download/v1.1.0/FreeTokens-1.1.0.dmg">Download for Mac</a>
+          <span class="trust">Apple Silicon. Keys stay on this machine.</span>
+        </div>
+        <div class="chips">
+          <div>
+            <div class="chip-k">Get Tokens</div>
+            <div class="chip-v">Free keys, collected in one pass</div>
+          </div>
+          <div>
+            <div class="chip-k">Local vault</div>
+            <div class="chip-v">macOS Keychain, this Mac only</div>
+          </div>
+          <div>
+            <div class="chip-k">Chat on those keys</div>
+            <div class="chip-v">Folder, files, agents. You press Apply</div>
+          </div>
+        </div>
+      </div>
+      <div class="hero-cards" aria-hidden="true">
+        <article class="card">
+          <div class="card-h">Vault <span>This machine</span></div>
+          <div class="row"><i class="dot"></i> Groq <span class="pct">Collected</span></div>
+          <div class="row"><i class="dot"></i> GitHub Models <span class="pct">Collected</span></div>
+          <div class="row"><i class="dot"></i> Google Gemini <span class="pct">Collected</span></div>
+          <div class="row"><i class="dot off"></i> DeepSeek <span class="pct">Idle</span></div>
+        </article>
+        <article class="card">
+          <div class="card-h">Chat <span>Apply stays with you</span></div>
+          <p style="font-size:14px;">Tighten the one-liner. Folder <strong>~/lovie</strong>. File <strong>Lovie-deck.pdf</strong>.</p>
+          <p class="note">README.diff sits in the thread until you press Apply. The landing demo never writes to disk.</p>
+        </article>
+      </div>
+    </div>
+    <div class="strip">
+      <div class="strip-l">
+        <span class="strip-k">Keys stay on this machine</span>
+        <span>Groq</span><span>GitHub Models</span><span>Gemini</span><span>Mistral</span>
+      </div>
+      <a href="#how">How does harvest work?</a>
+    </div>
+  </section>
+
+  <section class="section" id="what-is" aria-labelledby="def-title">
+    <div class="wrap">
+      <p class="kicker">02 — Definition</p>
+      <h2 id="def-title" data-pretext>What is a local token vault?</h2>
+      <p class="prose">A local token vault stores free LLM API keys as records on this Mac, instead of a pile of dashboards you paste from. You harvest once. Chat, agents, and file edits run on those keys. Lovie does not keep a copy.</p>
+      <ul class="bullets">
+        <li>Each provider is its own record. Collected or idle is a fact, not a spreadsheet you maintain.</li>
+        <li>Get Tokens walks the automatic providers in the app's own browser and writes keys to the macOS Keychain.</li>
+        <li>Chat is one surface. Folder and files attach as context. You press Apply on every edit.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section" id="problem" aria-labelledby="prob-title">
+    <div class="wrap">
+      <p class="kicker">03 — Problem</p>
+      <h2 id="prob-title" data-pretext>You already have free tokens. They are scattered.</h2>
+      <p class="prose">Groq, Gemini, GitHub Models, OpenRouter free tiers. Founders still pay OpenAI because the keys live in five accounts and none of them sit next to the file they need to edit.</p>
+      <div class="grid-3">
+        <article class="card">
+          <h3>Scattered dashboards</h3>
+          <p>Every provider is another signup, another console, another key to lose. Harvest is the pass you do once.</p>
+          <div class="stat-line"><span>Providers you already qualify for</span><b>Free tiers</b></div>
+        </article>
+        <article class="card">
+          <h3>You pay anyway</h3>
+          <p>Paid tokens are the default because free keys are not in one place. The vault is that place, on this machine.</p>
+          <div class="stat-line"><span>Where keys live</span><b>Keychain</b></div>
+        </article>
+        <article class="card">
+          <h3>Chat is somewhere else</h3>
+          <p>A folder, a deck, a README. You should not pick a product surface before you can ask a question about them.</p>
+          <div class="stat-line"><span>Who writes files</span><b>You press Apply</b></div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="capabilities" aria-labelledby="cap-title">
+    <div class="wrap">
+      <p class="kicker">04 — What it does</p>
+      <h2 id="cap-title" data-pretext>Harvest. Vault. Chat. You press Apply.</h2>
+      <p class="prose">Whether the vault is empty or you already have keys on disk, you start here. Get Tokens collects what it can. Manual providers wait for you. Then you talk in Chat, with folder and files on the thread.</p>
+
+      <article class="cap">
+        <div class="cap-n">01</div>
+        <div>
+          <h3>Harvest</h3>
+          <p class="prose" style="margin-top:8px">Press Get Tokens. The app opens each automatic provider in its own browser and collects a free key. A provider whose key still works is skipped. Manual providers (Gemini, a CAPTCHA, a phone number) stay in the list for you.</p>
+          <div class="cap-ui">
+            <span class="pill on">Get Tokens</span>
+            <span class="pill">Automatic</span>
+            <span class="pill">Manual</span>
+            <span class="pill">Sample keys only in this page</span>
+          </div>
+        </div>
+      </article>
+      <article class="cap">
+        <div class="cap-n">02</div>
+        <div>
+          <h3>Vault</h3>
+          <p class="prose" style="margin-top:8px">Collected keys live in the macOS Keychain. Older <code>~/.freetokens/keys.json</code> files import on first run. Copy a key when you need it. It does not leave this Mac unless you copy it.</p>
+          <div class="mini">
+            <div><span>On this machine</span><b>Keychain</b></div>
+            <div><span>Cloud copy</span><b>None</b></div>
+            <div><span>Import</span><b>Existing keys.json</b></div>
+          </div>
+        </div>
+      </article>
+      <article class="cap">
+        <div class="cap-n">03</div>
+        <div>
+          <h3>Chat. You press Apply.</h3>
+          <p class="prose" style="margin-top:8px">One Chat. Folder and files are context, not destinations. Auto-route across harvested keys, or pin Direct to a vault provider. Named agents open in the same Chat with a playbook attached. Diffs sit in the thread until you press Apply.</p>
+          <div class="cap-ui">
+            <span class="pill">Folder · ~/lovie</span>
+            <span class="pill">File · Lovie-deck.pdf</span>
+            <span class="pill">@agent</span>
+            <span class="pill on">Apply</span>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+
+  <section class="section" id="agents" aria-labelledby="agents-title">
+    <div class="wrap">
+      <p class="kicker">05 — Agents</p>
+      <h2 id="agents-title" data-pretext>Named teammates. Same Chat.</h2>
+      <p class="prose">Agents are a roster, not a builder. Each one is a teammate with a playbook. Opening one lands in Chat with its folder, files, and SKILL.md already on the thread. You still press Apply.</p>
+      <div class="grid-3">
+        <article class="card">
+          <h3>Default</h3>
+          <p>Answer from the vault. Auto-route across harvested keys. No extra playbook. This is Chat with no teammate pinned.</p>
+          <div class="stat-line"><span>Playbook</span><b>None</b></div>
+        </article>
+        <article class="card">
+          <h3>Deck critic</h3>
+          <p>Read the Lovie deck. Be blunt about what a partner would skip. Do not rewrite the company.</p>
+          <div class="stat-line"><span>SKILL.md</span><b>deck-critique.md</b></div>
+        </article>
+        <article class="card">
+          <h3>Open lands in Chat</h3>
+          <p>Folder, files, and skills ride with the agent. Create stays on the roster. Diffs still wait for Apply.</p>
+          <div class="stat-line"><span>Writes files</span><b>You press Apply</b></div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="native" aria-labelledby="nat-title">
+    <div class="wrap">
+      <p class="kicker">06 — Native Mac</p>
+      <h2 id="nat-title" data-pretext>Keys stay on this machine.</h2>
+      <p class="prose">FreeTokens is a Swift app. No bundled Chromium. Harvest runs in the app's own browser. Chat talks to the local gateway. Sign in with your Lovie account. The vault still lives on this Mac.</p>
+      <div class="grid-3">
+        <article class="card">
+          <h3>Swift, not a website</h3>
+          <p>Native macOS. Signed and notarized, so it opens without the Gatekeeper detour. Drag the dmg to Applications.</p>
+        </article>
+        <article class="card">
+          <h3>Keychain, not a server</h3>
+          <p>Keys are local. Lovie signs you in. Providers issue the tokens. We do not host your vault.</p>
+        </article>
+        <article class="card">
+          <h3>Harvest is not this page</h3>
+          <p>The sample below is fake keys. Get Tokens for real runs in the Mac app. That is the download.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="how" aria-labelledby="how-title">
+    <div class="wrap">
+      <p class="kicker">07 — How it works</p>
+      <div class="demo-intro">
+        <h2 id="how-title" data-pretext>Try the product.</h2>
+        <p class="prose">Walk a sample vault through harvest, a chat on those keys, and an agent with a playbook. Preview Get Tokens or an Apply. Everything stays in this browser. The same Chat is what you open after you install.</p>
+      </div>
+
+      <div class="sample-frame">
+        <div class="sample-chrome">
+          <div>
+            <div class="win-title">FreeTokens · sample</div>
+            <div class="win-sub">Local only</div>
+          </div>
+          <div class="win-actions">
+            <button type="button" class="btn btn-green" id="playHere">Play here</button>
+            <button type="button" class="btn btn-ghost" id="resetDemo">Reset →</button>
+          </div>
+        </div>
+        <iframe class="app-frame" id="appFrame" title="FreeTokens sample"></iframe>
+        <p class="sample-note">Saved in this browser. Sample vault. Not your keys. This is the Mac app, in this page.</p>
+      </div>
+
+      <div class="after-demo">
+        <a class="btn btn-ink" href="https://github.com/lovieco/freetokens-swift/releases/download/v1.1.0/FreeTokens-1.1.0.dmg">Download for Mac</a>
+        <span class="trust">Apple Silicon. Keys stay on this machine. Harvest happens in the app.</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="download" aria-labelledby="dl-title">
+    <div class="wrap">
+      <p class="kicker">08 — Download</p>
+      <h2 id="dl-title" data-pretext>Get the Mac app.</h2>
+      <p class="prose">FreeTokens 1.1.0. Signed and notarized. Open the dmg, drag FreeTokens to Applications, sign in with your Lovie account. Homebrew later. Not this release.</p>
+      <div class="dl-grid">
+        <article class="card">
+          <h3>Apple Silicon</h3>
+          <p class="prose" style="margin-top:8px">Current dmg. Universal Intel is not a second file in 1.1.0.</p>
+          <p style="margin-top:16px"><a class="btn btn-ink" href="https://github.com/lovieco/freetokens-swift/releases/download/v1.1.0/FreeTokens-1.1.0.dmg">Download FreeTokens-1.1.0.dmg</a></p>
+          <p class="note">2.4 MB · notarized · <a href="https://github.com/lovieco/freetokens-swift/releases/tag/v1.1.0">release notes</a></p>
+          <div class="code" id="sha">sha256:249da6a9362ffd1e0272ebb714fa533cf48ee17be68ac8a0ed8f41aae5170223</div>
+        </article>
+        <article class="card">
+          <h3>On your Mac</h3>
+          <ul class="req">
+            <li><b>macOS</b> Native Swift app. Notarized, so it opens by double-click.</li>
+            <li><b>Sign-in</b> Your Lovie account. Keys still stay in Keychain.</li>
+            <li><b>Accessibility</b> Asked when harvest needs real clicks.</li>
+            <li><b>Apply</b> Never writes until you press it, in the app.</li>
+          </ul>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="faq" aria-labelledby="faq-title">
+    <div class="wrap">
+      <p class="kicker">09 — Questions</p>
+      <h2 id="faq-title" data-pretext>Answers before you ask.</h2>
+      <div class="faq">
+        <details open>
+          <summary>Does harvest run in the browser?</summary>
+          <p>No. This page is a sample with fake keys. Get Tokens runs in the Mac app, in its own browser, on your machine.</p>
+        </details>
+        <details>
+          <summary>Where do keys live?</summary>
+          <p>On this machine, in the macOS Keychain. Not on Lovie servers. An older keys.json file imports on first run.</p>
+        </details>
+        <details>
+          <summary>Do I need an account?</summary>
+          <p>Sign in with your Lovie account to open the app. You still sign up at the providers for the tokens themselves. Lovie does not issue the keys.</p>
+        </details>
+        <details>
+          <summary>Apple Silicon or Intel?</summary>
+          <p>Apple Silicon is the current download. 1.1.0 does not ship a separate Intel dmg.</p>
+        </details>
+        <details>
+          <summary>Will Gatekeeper block it?</summary>
+          <p>The dmg is signed and notarized. Open it and drag FreeTokens to Applications. If macOS nags anyway, check the sha256 on the Download section against the file you got.</p>
+        </details>
+        <details>
+          <summary>Does Apply write my files?</summary>
+          <p>Only when you press Apply, in the Mac app. This landing demo never writes to disk. Diffs stay in the thread until you say so.</p>
+        </details>
+
+        <details>
+          <summary>What are Agents?</summary>
+          <p>Named teammates on the same Chat. Attach SKILL.md playbooks. Opening one lands in Chat with folder, files, and skills. Create stays on the roster. You press Apply on edits.</p>
+        </details>
+        <details>
+          <summary>Is this Accelerator Apply?</summary>
+          <p>No. FreeTokens is the Mac vault and Chat. Accelerator Apply is a sibling. It is not on this page.</p>
+        </details>
+      </div>
+
+      <div class="close">
+        <h2>Harvest on your Mac.</h2>
+        <p class="prose">Sample vault above. Real keys in the app. Apply stays with you.</p>
+        <div class="hero-cta">
+          <a class="btn btn-ink" href="https://github.com/lovieco/freetokens-swift/releases/download/v1.1.0/FreeTokens-1.1.0.dmg">Download for Mac</a>
+          <span class="trust">FreeTokens 1.1.0 · notarized · 2.4 MB</span>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <p>Free LLM tokens. Harvested on your Mac.</p>
+        <p style="margin-top:8px">A Lovie product.</p>
+      </div>
+      <div>
+        <h6>Product</h6>
+        <a href="#agents">Agents</a>
+        <a href="#how">How it works</a>
+        <a href="#download">Download</a>
+        <a href="https://www.lovie.co/captable/">CapTable</a>
+      </div>
+      <div>
+        <h6>Company</h6>
+        <a href="https://www.lovie.co/">Lovie</a>
+        <a href="https://github.com/lovieco/freetokens-swift">GitHub</a>
+        <a href="https://github.com/lovieco/freetokens-swift/releases/tag/v1.1.0">Release notes</a>
+      </div>
+      <div>
+        <h6>Legal</h6>
+        <a href="https://www.lovie.co/privacy">Privacy</a>
+        <a href="https://www.lovie.co/terms">Terms</a>
+      </div>
+    </div>
+    <p class="legal">© 2026 Lovie Technology Inc. FreeTokens is a Mac app. This page is a sample.</p>
+  </div>
+</footer>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script src="./pretext.js"></script>
+<script>
+function currentTheme() {
+  return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+}
+function setTheme(t) {
+  const theme = t === "dark" ? "dark" : "light";
+  document.documentElement.setAttribute("data-theme", theme);
+  try { localStorage.setItem("ft-landing-theme", theme); } catch (e) {}
+  document.querySelectorAll("[data-theme-set]").forEach((b) => b.classList.toggle("on", b.dataset.themeSet === theme));
+  const frame = document.getElementById("appFrame");
+  try { frame.contentWindow.setSampleTheme(theme); } catch (e) {}
+}
+function loadApp() {
+  const frame = document.getElementById("appFrame");
+  frame.src = "app-embed.html?t=" + Date.now();
+  frame.onload = () => {
+    try { frame.contentWindow.setSampleTheme(currentTheme()); } catch (e) {}
+  };
+}
+(function initTheme() {
+  let theme = "light";
+  try { theme = localStorage.getItem("ft-landing-theme") || ""; } catch (e) {}
+  if (!theme) theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  setTheme(theme);
+})();
+document.querySelectorAll("[data-theme-set]").forEach((b) => {
+  b.onclick = () => setTheme(b.dataset.themeSet);
+});
+loadApp();
+window.addEventListener("message", (e) => {
+  if (e.data && e.data.type === "ft-reset") loadApp();
+});
+document.getElementById("playHere").onclick = () => {
+  const frame = document.getElementById("appFrame");
+  try { frame.contentWindow.playSample(); } catch (e) {}
+};
+document.getElementById("resetDemo").onclick = () => {
+  const frame = document.getElementById("appFrame");
+  try { frame.contentWindow.resetSample(); } catch (e) { loadApp(); }
+};
+async function pretextHeadings() {
+  if (!window.Pretext) return;
+  await document.fonts.ready;
+  const { prepare, layout } = window.Pretext;
+  const els = document.querySelectorAll("[data-pretext]");
+  const font = getComputedStyle(document.documentElement).getPropertyValue("--font-serif").trim() || "Cambo, Georgia, serif";
+  const relayout = () => {
+    els.forEach((el) => {
+      const size = parseFloat(getComputedStyle(el).fontSize) || 40;
+      const width = el.clientWidth;
+      if (width < 40) return;
+      const prepared = prepare(el.textContent, `${size}px ${font}`);
+      const { height } = layout(prepared, width, size * 1.12);
+      el.style.minHeight = `${Math.ceil(height)}px`;
+    });
+  };
+  relayout();
+  const ro = new ResizeObserver(relayout);
+  els.forEach((el) => ro.observe(el));
+}
+pretextHeadings();
+</script>
+</body>
+</html>
